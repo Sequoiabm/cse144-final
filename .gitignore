@@ -12,6 +12,11 @@ submission.csv
 
 # Data (competition data is mounted on Kaggle; not committed)
 Data/
+.claude
+
+# Internal working docs (kept local, not exposed on the public repo)
+info/
+Directions/
 
 # OS
 .DS_Store

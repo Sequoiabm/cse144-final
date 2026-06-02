@@ -93,4 +93,4 @@ python src/predict.py --backbones convnext_small --out submission.csv   # single
 
 - **Trained weights (Google Drive):** _<link TBD — uploaded after the final ≥96% run>_
 - **Kaggle leaderboard screenshot:** _<image TBD — added after submission>_
-- **Report (PDF):** see `info/` for the dev log / experiment table that feeds it.
+- **Report (PDF):** _<added with the final submission>_
