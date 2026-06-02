@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Training artifacts (weights go to Google Drive, not git)
+checkpoints/
+logs/
+*.pt
+*.npz
+submission.csv
+
+# Data (competition data is mounted on Kaggle; not committed)
+Data/
+
+# OS
+.DS_Store
