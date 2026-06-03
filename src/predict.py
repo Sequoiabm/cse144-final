@@ -1,7 +1,7 @@
 """Inference: load every fold checkpoint of every ensemble backbone, run TTA
 (hflip + optional multi-scale), average softmax across folds x backbones x TTA views
 (optionally OOF-weighted, OOF-tuned temperature), and write a validated submission.csv
-for exactly the 1,000 sample_submission IDs.
+for every image in Data/test/ (1036 IDs as of Spring 2026).
 
 Usage:
   python src/predict.py                                  # use config.ensemble, EMA ckpts
@@ -29,7 +29,7 @@ def parse_args():
     p.add_argument("--config", default="config.yaml")
     p.add_argument("--ckpt-dir", default=None, help="default config.output.ckpt_dir")
     p.add_argument("--backbones", default=None, help="comma list (default config.ensemble)")
-    p.add_argument("--template", default=None, help="default config.data.sample_submission")
+    p.add_argument("--template", default=None, help="legacy: use sample_submission IDs (1000) instead of all test images")
     p.add_argument("--out", default="submission.csv")
     p.add_argument("--device", default=None)
     p.add_argument("--raw", action="store_true", help="use raw (non-EMA) checkpoints")
@@ -78,7 +78,7 @@ def main():
     args = parse_args()
     cfg = U.load_config(args.config)
     ckpt_dir = args.ckpt_dir or cfg["output"]["ckpt_dir"]
-    template = args.template or cfg["data"]["sample_submission"]
+    test_dir = cfg["data"]["test_dir"]
     backbones = (args.backbones.split(",") if args.backbones else cfg["ensemble"])
     device = U.get_device(args.device)
     logger = U.setup_logging(cfg["output"]["log_dir"], name="predict")
@@ -86,7 +86,11 @@ def main():
 
     inf = cfg["inference"]
     temperature = inf.get("temperature", 1.0)
-    ids = D.load_test_ids(template)
+    if args.template:
+        ids = D.load_test_ids(args.template)
+        logger.warning(f"using --template ({len(ids)} IDs); Kaggle expects all images in {test_dir}")
+    else:
+        ids = D.load_all_test_ids(test_dir)
     num_classes = cfg["data"]["num_classes"]
     logger.info(f"ensemble={backbones} ids={len(ids)} device={device} "
                 f"tta_hflip={inf['tta']['hflip']} T={temperature} weight_by_oof={inf['weight_by_oof']}")
@@ -126,7 +130,10 @@ def main():
     preds = ensemble_probs.argmax(1).astype(int)
 
     sub = pd.DataFrame({"ID": ids, "Label": preds})
-    U.validate_submission(sub, template)
+    if args.template:
+        U.validate_submission(sub, template_path=args.template, num_classes=num_classes)
+    else:
+        U.validate_submission(sub, test_dir=test_dir, num_classes=num_classes)
     sub.to_csv(args.out, index=False)
     logger.info(f"wrote {args.out} ({len(sub)} rows) — validated OK")
 

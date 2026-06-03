@@ -4,8 +4,9 @@ Fine-tunes diverse ImageNet-21k pretrained backbones into a 100-class classifier
 ensembles them (5-fold CV × multi-architecture × test-time augmentation) to maximize
 held-out test accuracy on the [UCSC CSE 144 Spring 2026 Kaggle competition](https://www.kaggle.com/competitions/ucsc-cse-144-spring-2026-final-project).
 
-Data: **1,079** train images across **100** classes (4–41 images/class), predict the
-**1,000** test IDs in `sample_submission.csv`.
+Data: **1,079** train images across **100** classes (4–41 images/class), predict **all
+1,036** images in `Data/test/` (`0.jpg`–`1035.jpg`). `sample_submission.csv` is only a
+format example (1000 rows) — Kaggle scoring requires the full test folder.
 
 > ⚠️ **Label mapping (the #1 failure mode):** the folder name *is* the label
 > (`train/7/...` → class `7`). We build an explicit `int(folder)` map and **assert
@@ -22,29 +23,41 @@ src/
   predict.py  # CLI: load all ckpts, TTA + multi-fold/multi-arch softmax ensemble → validated submission.csv
   utils.py    # seeding/determinism, device select, metrics, logging, submission validator
 config.yaml   # SEED + all hyperparameters (backbones, folds, aug, lr/llrd, mixup, ema, …)
-model.ipynb   # thin Kaggle wrapper (install → train → predict → submit)
+model.ipynb   # thin Colab wrapper (GPU → Drive Data → train → predict → download)
 requirements.txt
 checkpoints/  # produced by train.py (per-backbone/per-fold ckpts + OOF + resolved config)
 ```
 
 ## Environment
 
-| | Local dev (scratch) | Kaggle (reported source of truth) |
+| | Local (MPS) | Google Colab (primary) |
 |---|---|---|
-| Device | Apple M2 Pro, MPS | NVIDIA GPU (CUDA), AMP enabled |
-| Python | 3.11.5 | Kaggle base image |
-| torch / torchvision | 2.1.2 / 0.16.2 | base image build |
-| timm | 1.0.27 | 1.0.27 (pinned, installed in notebook) |
+| Device | Apple M2 Pro, MPS | NVIDIA T4/A100, CUDA, AMP on |
+| Python | 3.11.5 | Colab default |
+| torch / torchvision | 2.1.2 / 0.16.2 (pinned in requirements.txt) | Colab preinstall (use as-is) |
+| timm | 1.0.27 | `pip install timm==1.0.27` in notebook |
 
 The code is device-agnostic (`cuda → mps → cpu`). AMP is auto-enabled only on CUDA.
-EMA uses the per-tensor update path (`foreach=False`) for MPS compatibility. Local MPS
-runs are for development only; reported results come from the Kaggle CUDA notebook.
+EMA uses `foreach=False` for MPS compatibility. Use Colab GPU for full training runs.
 
-## Setup
+## Google Colab (quick start)
+
+1. **Runtime → Change runtime type → GPU.**
+2. Upload `Data/` to Google Drive (keep `train/`, `test/`, `sample_submission.csv`).
+3. Open `model.ipynb` in Colab (upload, or open from GitHub after push).
+4. Edit in the notebook:
+   - `REPO_URL` — your public GitHub clone URL (or `%cd` to a Drive copy of the whole repo and skip clone).
+   - `DATA_ON_DRIVE` — path to `Data` on Drive (e.g. `/content/drive/MyDrive/CSE144/Data`).
+   - `CKPT_DRIVE` — where to persist `checkpoints/` between sessions.
+5. Run cells in order: install → mount Drive → train → predict → **download** `submission.csv`.
+6. Submit at the [Kaggle competition page](https://www.kaggle.com/competitions/ucsc-cse-144-spring-2026-final-project/submit) — file must have **1036 rows**.
+
+**Session tips:** Colab disks reset when the runtime ends. Sync `checkpoints/` to Drive after each backbone. To resume inference only, restore checkpoints then run `python src/predict.py --out submission.csv`.
+
+## Setup (local)
 
 ```bash
-pip install -r requirements.txt        # local
-# On Kaggle, torch/torchvision come from the base image; install only: pip install timm==1.0.27
+pip install -r requirements.txt
 ```
 
 ## Train
@@ -70,8 +83,8 @@ Useful flags: `--folds 0,1`, `--epochs N`, `--batch-size N`, `--img-size N`,
 ## Inference → submission.csv
 
 Loads every fold of every backbone in `config.ensemble`, applies hflip TTA, averages
-softmax, and writes a **format-validated** `submission.csv` for exactly the 1,000
-template IDs:
+softmax, and writes a **format-validated** `submission.csv` for all **1,036** test IDs
+(numeric sort: `0.jpg` … `1035.jpg`):
 
 ```bash
 python src/predict.py --out submission.csv

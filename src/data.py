@@ -64,10 +64,20 @@ def build_samples(train_dir: str, num_classes: int = 100) -> tuple[list[str], np
 
 
 # --------------------------------------------------------------------------- #
-# Test IDs (predict ONLY the sample_submission rows)
+# Test IDs (Kaggle expects every image in test_dir — currently 1036)
 # --------------------------------------------------------------------------- #
+def load_all_test_ids(test_dir: str) -> list[str]:
+    """All test filenames sorted numerically: 0.jpg, 1.jpg, …, 1035.jpg."""
+    ids = [
+        f for f in os.listdir(test_dir)
+        if f.lower().endswith((".jpg", ".jpeg", ".png"))
+    ]
+    ids.sort(key=lambda x: int(os.path.splitext(x)[0]))
+    return ids
+
+
 def load_test_ids(sample_submission: str) -> list[str]:
-    """The exact IDs to predict (e.g. '0.jpg'..'999.jpg'), in template order."""
+    """IDs from sample_submission.csv (1000 rows). Legacy helper — do not use for Kaggle submit."""
     return pd.read_csv(sample_submission)["ID"].astype(str).tolist()
 
 
@@ -148,7 +158,7 @@ class TrainDataset(Dataset):
 
 
 class TestDataset(Dataset):
-    """Test images for the given IDs (sample_submission order). Returns (img, id_str)."""
+    """Test images for the given IDs (numeric filename order). Returns (img, id_str)."""
 
     def __init__(self, test_dir: str, ids: list[str], transform: Callable):
         self.paths = [os.path.join(test_dir, i) for i in ids]

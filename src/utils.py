@@ -126,17 +126,38 @@ def setup_logging(log_dir: str | None = None, name: str = "run") -> logging.Logg
 # --------------------------------------------------------------------------- #
 # Submission validation
 # --------------------------------------------------------------------------- #
-def validate_submission(sub: pd.DataFrame, template_path: str) -> None:
+def validate_submission(
+    sub: pd.DataFrame,
+    *,
+    test_dir: str | None = None,
+    template_path: str | None = None,
+    num_classes: int = 100,
+) -> None:
     """Hard-fail the build if submission shape/IDs/labels are wrong.
 
-    Checks: exactly the template's rows, identical ID set & order, header
-    ['ID','Label'], integer labels in 0..99, no NaNs.
+    Prefer test_dir (all images in Data/test/, sorted 0..N-1). template_path is legacy.
+    Checks: expected row count, identical ID set & order, header ['ID','Label'],
+    integer labels in 0..num_classes-1, no NaNs.
     """
-    template = pd.read_csv(template_path)
+    if test_dir:
+        import data as D
+
+        expected_ids = D.load_all_test_ids(test_dir)
+    elif template_path:
+        expected_ids = pd.read_csv(template_path)["ID"].astype(str).tolist()
+    else:
+        raise ValueError("validate_submission requires test_dir or template_path")
+
     assert list(sub.columns) == ["ID", "Label"], f"columns must be ['ID','Label'], got {list(sub.columns)}"
-    assert len(sub) == len(template), f"row count {len(sub)} != template {len(template)}"
-    assert list(sub["ID"]) == list(template["ID"]), "ID column must match template exactly (same IDs, same order)"
+    assert len(sub) == len(expected_ids), (
+        f"row count {len(sub)} != expected {len(expected_ids)} "
+        f"(Kaggle needs every file in test_dir)"
+    )
+    assert list(sub["ID"].astype(str)) == expected_ids, (
+        "ID column must list every test image, sorted numerically (0.jpg, 1.jpg, …)"
+    )
     assert sub["Label"].notna().all(), "Label has NaNs"
     labels = sub["Label"].astype(int)
-    assert ((labels >= 0) & (labels <= 99)).all(), "labels must be in 0..99"
+    hi = num_classes - 1
+    assert ((labels >= 0) & (labels <= hi)).all(), f"labels must be in 0..{hi}"
     assert (labels == sub["Label"]).all(), "labels must be integers"
