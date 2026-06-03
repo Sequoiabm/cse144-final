@@ -23,7 +23,7 @@ cv:
 backbones:
   convnext_small:
     timm: convnext_small.fb_in22k_ft_in1k   # primary; strong 21k->1k natural-image transfer
-    img_size: 224
+    img_size: 288   # EXPERIMENT 2026-06-02: resolution bump 224->288 (was 224)
   convnext_small_384:
     timm: convnext_small.fb_in22k_ft_in1k_384  # high-res pass (matched 384 checkpoint)
     img_size: 384
@@ -44,7 +44,7 @@ ensemble: [convnext_small, effv2s, vit_base]
 
 train:
   batch_size: 32
-  epochs: 40
+  epochs: 15      # EXPERIMENT 2026-06-02: 40->15 (val plateaus by ~ep10-15; tail was dead weight)
   warmup_epochs: 4
   lr: 1.0e-3              # peak head LR (AdamW); backbone scaled down by LLRD
   min_lr: 1.0e-6
