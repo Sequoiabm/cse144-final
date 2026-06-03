@@ -48,7 +48,7 @@ ensemble: [convnext_small, convnext_base]
 
 train:
   batch_size: 32
-  epochs: 40
+  epochs: 20
   warmup_epochs: 4
   lr: 1.0e-3              # peak head LR (AdamW); backbone scaled down by LLRD
   min_lr: 1.0e-6
