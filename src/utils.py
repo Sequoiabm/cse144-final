@@ -9,6 +9,7 @@ import logging
 import os
 import random
 import sys
+import copy
 from typing import Any
 
 import numpy as np
@@ -72,8 +73,8 @@ def resolve_backbone(cfg: dict[str, Any], key: str) -> dict[str, Any]:
     """Merge global train.* with a backbone entry's overrides; return a flat spec."""
     if key not in cfg["backbones"]:
         raise KeyError(f"backbone '{key}' not in config.backbones {list(cfg['backbones'])}")
-    entry = dict(cfg["backbones"][key])
-    train = dict(cfg["train"])
+    entry = copy.deepcopy(cfg["backbones"][key])
+    train = copy.deepcopy(cfg["train"])
     train.update(entry.pop("overrides", {}) or {})
     return {"key": key, "timm": entry["timm"], "img_size": entry.get("img_size"), "train": train}
 

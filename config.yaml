@@ -23,7 +23,11 @@ cv:
 backbones:
   convnext_small:
     timm: convnext_small.fb_in22k_ft_in1k   # primary; strong 21k->1k natural-image transfer
-    img_size: 288   # EXPERIMENT 2026-06-02: resolution bump 224->288 (was 224)
+    img_size: 224
+  convnext_base:
+    timm: convnext_base.fb_in22k_ft_in1k    # first high-yield gate after ConvNeXt-S plateau
+    img_size: 224
+    overrides: { batch_size: 16 }
   convnext_small_384:
     timm: convnext_small.fb_in22k_ft_in1k_384  # high-res pass (matched 384 checkpoint)
     img_size: 384
@@ -39,12 +43,12 @@ backbones:
     timm: eva02_small_patch14_224.mim_in22k # transformer alt (MIM 21k features; head replaced)
     img_size: 224
 
-# Final committed ensemble (predict.py averages all folds of each of these).
-ensemble: [convnext_small, effv2s, vit_base]
+# Current gated ensemble target: add EffV2-S / ViT-B only if this clears ~0.80 OOF.
+ensemble: [convnext_small, convnext_base]
 
 train:
   batch_size: 32
-  epochs: 15      # EXPERIMENT 2026-06-02: 40->15 (val plateaus by ~ep10-15; tail was dead weight)
+  epochs: 40
   warmup_epochs: 4
   lr: 1.0e-3              # peak head LR (AdamW); backbone scaled down by LLRD
   min_lr: 1.0e-6

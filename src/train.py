@@ -41,7 +41,32 @@ def parse_args():
     p.add_argument("--img-size", type=int, default=None)
     p.add_argument("--limit-classes", type=int, default=None, help="use only classes 0..N-1")
     p.add_argument("--no-mixup", action="store_true", help="disable mixup/cutmix (overfit sanity)")
+    p.add_argument(
+        "--aug-profile",
+        choices=["default", "softer"],
+        default="default",
+        help="default config aug, or softer fine-grained aug ablation",
+    )
     return p.parse_args()
+
+
+def apply_aug_profile(spec: dict, profile: str) -> None:
+    """Apply named augmentation ablations in-place."""
+    if profile == "default":
+        return
+    if profile == "softer":
+        # Less destructive setting for fine-grained 100-way transfer.
+        spec["train"]["aug"].update({
+            "color_jitter": 0.25,
+            "reprob": 0.15,
+            "train_crop_min": 0.55,
+        })
+        spec["train"]["mixup"].update({
+            "mixup_alpha": 0.1,
+            "cutmix_alpha": 0.5,
+        })
+        return
+    raise ValueError(f"unknown augmentation profile: {profile}")
 
 
 def make_loss(mixup_active: bool, label_smoothing: float):
@@ -187,6 +212,7 @@ def main():
     if args.batch_size is not None: spec["train"]["batch_size"] = args.batch_size
     if args.img_size is not None: spec["img_size"] = args.img_size
     if args.no_mixup: spec["train"]["mixup"]["enabled"] = False
+    apply_aug_profile(spec, args.aug_profile)
 
     out_dir = os.path.join(args.out or cfg["output"]["ckpt_dir"], args.backbone)
     os.makedirs(out_dir, exist_ok=True)
@@ -195,7 +221,8 @@ def main():
     device = U.get_device(args.device)
     U.seed_everything(cfg["seed"])
     logger.info(f"backbone={args.backbone} timm={spec['timm']} img={spec['img_size']} "
-                f"device={device} amp={U.amp_enabled(spec['train']['amp'], device)}")
+                f"device={device} amp={U.amp_enabled(spec['train']['amp'], device)} "
+                f"aug_profile={args.aug_profile}")
 
     num_classes = cfg["data"]["num_classes"]
     paths, labels = D.build_samples(cfg["data"]["train_dir"], num_classes)
@@ -237,6 +264,7 @@ def main():
         np.savez(os.path.join(out_dir, "oof.npz"),
                  logits=oof_logits, labels=labels, covered=done)
     U.save_config(cfg, os.path.join(out_dir, "resolved_config.yaml"))
+    U.save_config(spec, os.path.join(out_dir, "resolved_backbone_spec.yaml"))
     logger.info(f"fold accs: {fold_accs}")
 
 
