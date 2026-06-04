@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import tempfile
 
 import numpy as np
 import torch
@@ -41,6 +42,7 @@ def parse_args():
     p.add_argument("--img-size", type=int, default=None)
     p.add_argument("--limit-classes", type=int, default=None, help="use only classes 0..N-1")
     p.add_argument("--no-mixup", action="store_true", help="disable mixup/cutmix (overfit sanity)")
+    p.add_argument("--save-raw", action="store_true", help="also save raw non-EMA checkpoints")
     p.add_argument(
         "--aug-profile",
         choices=["default", "softer"],
@@ -48,6 +50,23 @@ def parse_args():
         help="default config aug, or softer fine-grained aug ablation",
     )
     return p.parse_args()
+
+
+def atomic_torch_save(obj, path: str) -> None:
+    """Save through a temp file so interrupted writes do not corrupt the target."""
+    out_dir = os.path.dirname(path) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=f".{os.path.basename(path)}.", suffix=".tmp", dir=out_dir)
+    os.close(fd)
+    try:
+        torch.save(obj, tmp)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def apply_aug_profile(spec: dict, profile: str) -> None:
@@ -251,9 +270,10 @@ def main():
         meta = {"timm_name": spec["timm"], "img_size": spec["img_size"],
                 "num_classes": num_classes, "backbone_key": args.backbone,
                 "fold": fold, "val_acc": acc}
-        torch.save({**meta, "state_dict": raw}, os.path.join(out_dir, f"fold{fold}_raw.pt"))
         if ema_sd is not None:
-            torch.save({**meta, "state_dict": ema_sd}, os.path.join(out_dir, f"fold{fold}_ema.pt"))
+            atomic_torch_save({**meta, "state_dict": ema_sd}, os.path.join(out_dir, f"fold{fold}_ema.pt"))
+        if args.save_raw:
+            atomic_torch_save({**meta, "state_dict": raw}, os.path.join(out_dir, f"fold{fold}_raw.pt"))
         logger.info(f"=== fold {fold} best val_acc={acc:.4f} saved ===")
 
     # OOF accuracy over folds actually run (full OOF when all folds run)

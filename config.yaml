@@ -65,7 +65,7 @@ train:
   early_stop_patience: 1000 # effectively DISABLED: with cosine LR the best epoch is in the
                             # low-LR tail (fold 0 won at full 40 ep; early-stopped folds lost
                             # ~1-2%). Best-EMA-val ckpt is still selected across all epochs.
-  num_workers: 2          # Colab free has 2 CPUs; 4 workers warned (slowdown/freeze risk)
+  num_workers: 2          # Colab free has 2 CPUs (GPU-bound anyway). Bump locally for MPS if desired.
 
   # Augmentation (timm create_transform). Eval = resize->center-crop at img_size.
   aug:

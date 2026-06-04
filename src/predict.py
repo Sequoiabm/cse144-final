@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -37,11 +38,24 @@ def parse_args():
 
 
 def find_ckpts(ckpt_dir: str, backbone: str, use_ema: bool) -> list[str]:
-    tag = "ema" if use_ema else "raw"
-    ck = sorted(glob.glob(os.path.join(ckpt_dir, backbone, f"fold*_{tag}.pt")))
-    if not ck and use_ema:  # fall back to raw if no EMA saved
-        ck = sorted(glob.glob(os.path.join(ckpt_dir, backbone, "fold*_raw.pt")))
-    return ck
+    """Return one checkpoint per fold, preferring EMA and falling back to raw."""
+    root = os.path.join(ckpt_dir, backbone)
+    by_fold: dict[int, dict[str, str]] = {}
+    for path in glob.glob(os.path.join(root, "fold*_*.pt")):
+        m = re.search(r"fold(\d+)_(ema|raw)\.pt$", os.path.basename(path))
+        if not m:
+            continue
+        fold, tag = int(m.group(1)), m.group(2)
+        by_fold.setdefault(fold, {})[tag] = path
+
+    ckpts = []
+    for fold in sorted(by_fold):
+        choices = (["ema", "raw"] if use_ema else ["raw", "ema"])
+        for tag in choices:
+            if tag in by_fold[fold]:
+                ckpts.append(by_fold[fold][tag])
+                break
+    return ckpts
 
 
 def oof_accuracy(ckpt_dir: str, backbone: str) -> float | None:
