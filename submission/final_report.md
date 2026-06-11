@@ -325,9 +325,9 @@ the final submission.
 - UCSC CSE 144 Spring 2026 Final Project handout. Local project copy:
   `Directions/md/CSE144_Project_Page.md`.
 - PyTorch documentation, `torch.utils.data`.
-  https://docs.pytorch.org/docs/2.12/data.html
+  https://docs.pytorch.org/docs/2.1/data.html
 - PyTorch documentation, "Reproducibility".
-  https://docs.pytorch.org/docs/2.12/notes/randomness.html
+  https://docs.pytorch.org/docs/2.1/notes/randomness.html
 - TorchVision documentation, "Models and pre-trained weights".
   https://docs.pytorch.org/vision/stable/models.html
 - `timm` documentation, "Models" reference.
