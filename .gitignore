@@ -20,7 +20,6 @@ Data.zip
 
 # Internal working docs (kept local, not exposed on the public repo)
 info/
-Directions/
 claude-convo-chat.md
 codex-convo-agent.md
 log.md

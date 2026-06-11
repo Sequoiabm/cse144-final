@@ -1,109 +1,152 @@
-# CSE 144 Final Project — Transfer-Learning Image Classifier (100 classes)
+# CSE 144 Final Project: Kaggle Transfer Learning Challenge
 
-Fine-tunes diverse ImageNet-21k pretrained backbones into a 100-class classifier and
-ensembles them (5-fold CV × multi-architecture × test-time augmentation) to maximize
-held-out test accuracy on the [UCSC CSE 144 Spring 2026 Kaggle competition](https://www.kaggle.com/competitions/ucsc-cse-144-spring-2026-final-project).
+100-class image classification using transfer learning for the UCSC CSE 144
+Spring 2026 Kaggle competition.
 
-Data: **1,079** train images across **100** classes (4–41 images/class), predict **all
-1,036** images in `Data/test/` (`0.jpg`–`1035.jpg`). `sample_submission.csv` is only a
-format example (1000 rows) — Kaggle scoring requires the full test folder.
+## Start Here
 
-> ⚠️ **Label mapping (the #1 failure mode):** the folder name *is* the label
-> (`train/7/...` → class `7`). We build an explicit `int(folder)` map and **assert
-> `"0"→0 … "99"→99`** at load time. We never rely on `ImageFolder`'s alphabetical class
-> order, which would scramble labels and produce ~random accuracy.
+Teacher-facing deliverables are organized in `submission/`:
 
-## Repository layout
+| Item | Location |
+|---|---|
+| Final report source | `submission/final_report.md` |
+| Final report PDF | `submission/final_report.pdf` |
+| Kaggle submission CSV | `submission/submission.csv` |
+| Source code | `src/` |
+| Model/training config | `config.yaml` |
+| Dependencies | `requirements.txt` |
+| Weights link | `weights/README.md` |
+| Leaderboard screenshot | `assets/kaggle_leaderboard.png` |
 
-```
+The final report PDF, model-weights link, and Kaggle screenshot are included or
+referenced in this repository.
+
+## Required External Links
+
+- Kaggle competition:
+  https://www.kaggle.com/competitions/ucsc-cse-144-spring-2026-final-project
+- Trained model weights:
+  https://drive.google.com/drive/folders/1B2p5ubG2Yc7x4FiWw4xVz9-ZXNZAlHzD?usp=share_link
+
+## Results
+
+| Model | Validation / Kaggle result |
+|---|---:|
+| ConvNeXt-S | 0.7720 reported OOF; 0.8000 Kaggle public accuracy |
+| ConvNeXt-B | 0.7961 OOF accuracy |
+| ConvNeXt-S + ConvNeXt-B equal OOF ensemble | 0.7924 OOF accuracy |
+| Final team Kaggle submission | 0.95454 public score |
+
+Best offline model: ConvNeXt-B.  
+Best confirmed team Kaggle public score: 0.95454.
+
+Leaderboard screenshot:
+
+![Kaggle leaderboard screenshot](assets/kaggle_leaderboard.png)
+
+## Repository Layout
+
+```text
 src/
-  data.py     # folder→label map (+assert), RGB cleaning, stratified k-fold, timm transforms, datasets
-  model.py    # timm backbone factory + 100-way head (dropout), EMA (warmup), layer-wise-LR-decay groups
-  train.py    # CLI: fine-tune ONE backbone across folds → per-fold raw+EMA ckpts + OOF logits + config
-  predict.py  # CLI: load all ckpts, TTA + multi-fold/multi-arch softmax ensemble → validated submission.csv
-  utils.py    # seeding/determinism, device select, metrics, logging, submission validator
-config.yaml   # SEED + all hyperparameters (backbones, folds, aug, lr/llrd, mixup, ema, …)
-model.ipynb   # thin Colab wrapper (GPU → Drive Data → train → predict → download)
-requirements.txt
-checkpoints/  # produced by train.py (per-backbone/per-fold ckpts + OOF + resolved config)
+  data.py           # label mapping, datasets, transforms, folds
+  model.py          # timm model factory, EMA, layer-wise LR decay
+  train.py          # fine-tuning and OOF checkpoint generation
+  predict.py        # inference and validated submission.csv writing
+  oof_ensemble.py   # OOF ensemble analysis
+  rebuild_oof.py    # rebuild OOF from checkpoints
+  utils.py          # config, logging, seeding, validation helpers
+
+submission/
+  README.md
+  final_report.md
+  final_report.pdf
+  submission.csv
+  project_instructions.md
+
+reports/
+  final_report.md
+  CSE144_Final_Report.md
+  CSE144_Approach_Presentation.md
+
+weights/
+  README.md         # Google Drive checkpoint link goes here
+
+assets/
+  README.md
+  kaggle_leaderboard.png
+
+archive/
+  development_notes/
+  old_outputs/
 ```
 
-## Environment
-
-| | Local (MPS) | Google Colab (primary) |
-|---|---|---|
-| Device | Apple M2 Pro, MPS | NVIDIA T4/A100, CUDA, AMP on |
-| Python | 3.11.5 | Colab default |
-| torch / torchvision | 2.1.2 / 0.16.2 (pinned in requirements.txt) | Colab preinstall (use as-is) |
-| timm | 1.0.27 | `pip install timm==1.0.27` in notebook |
-
-The code is device-agnostic (`cuda → mps → cpu`). AMP is auto-enabled only on CUDA.
-EMA uses `foreach=False` for MPS compatibility. Use Colab GPU for full training runs.
-
-## Google Colab (quick start)
-
-1. **Runtime → Change runtime type → GPU.**
-2. Upload `Data/` to Google Drive (keep `train/`, `test/`, `sample_submission.csv`).
-3. Open `model.ipynb` in Colab (upload, or open from GitHub after push).
-4. Edit in the notebook:
-   - `REPO_URL` — your public GitHub clone URL (or `%cd` to a Drive copy of the whole repo and skip clone).
-   - `DATA_ON_DRIVE` — path to `Data` on Drive (e.g. `/content/drive/MyDrive/CSE144/Data`).
-   - `CKPT_DRIVE` — where to persist `checkpoints/` between sessions.
-5. Run cells in order: install → mount Drive → train → predict → **download** `submission.csv`.
-6. Submit at the [Kaggle competition page](https://www.kaggle.com/competitions/ucsc-cse-144-spring-2026-final-project/submit) — file must have **1036 rows**.
-
-**Session tips:** Colab disks reset when the runtime ends. Sync `checkpoints/` to Drive after each backbone. To resume inference only, restore checkpoints then run `python src/predict.py --out submission.csv`.
-
-## Setup (local)
+## Setup
 
 ```bash
 pip install -r requirements.txt
 ```
 
+Pinned local versions:
+
+- Python 3.11.5
+- torch 2.1.2
+- torchvision 0.16.2
+- timm 1.0.27
+
+The code selects `cuda`, then `mps`, then `cpu`. AMP is enabled on CUDA only.
+
 ## Train
 
-Fine-tune one backbone across all folds (saves per-fold raw + EMA checkpoints, OOF
-logits, and the resolved config under `checkpoints/<backbone>/`):
+Train the best offline model, ConvNeXt-B:
 
 ```bash
-python src/train.py --backbone convnext_small      # primary ConvNeXt-S (21k→1k)
-python src/train.py --backbone effv2s              # EfficientNetV2-S (21k)
-python src/train.py --backbone vit_base            # ViT-B/16 (augreg 21k)
+PYTORCH_ENABLE_MPS_FALLBACK=1 python src/train.py \
+  --backbone convnext_base \
+  --device mps \
+  --batch-size 8 \
+  --out checkpoints_local
 ```
 
-Quick local sanity / label-map gate (subset of classes, few epochs):
+Train the ConvNeXt-S baseline:
 
 ```bash
-python src/train.py --backbone convnext_small --folds 0 --epochs 5 --limit-classes 10 --device mps
+python src/train.py --backbone convnext_small --out checkpoints_local
 ```
 
-Useful flags: `--folds 0,1`, `--epochs N`, `--batch-size N`, `--img-size N`,
-`--limit-classes N`, `--no-mixup`, `--device cuda|mps|cpu`.
-
-## Inference → submission.csv
-
-Loads every fold of every backbone in `config.ensemble`, applies hflip TTA, averages
-softmax, and writes a **format-validated** `submission.csv` for all **1,036** test IDs
-(numeric sort: `0.jpg` … `1035.jpg`):
+## Validate OOF Results
 
 ```bash
-python src/predict.py --out submission.csv
-python src/predict.py --backbones convnext_small --out submission.csv   # single backbone
+python src/oof_ensemble.py \
+  --ckpt-dir checkpoints_local \
+  --backbones convnext_small,convnext_base
 ```
 
-## Reproducibility
+Expected recorded output:
 
-- Fixed `SEED` in `config.yaml`; `seed_everything` seeds python/numpy/torch and sets
-  `cudnn.deterministic=True`. Residual GPU nondeterminism (some CUDA/MPS kernels) means
-  bitwise-identical runs aren't guaranteed, but results are stable across seeds.
-- Every hyperparameter lives in `config.yaml`; each `train.py` run snapshots the resolved
-  config next to its checkpoints.
-- Pinned versions in `requirements.txt`. Validation is leak-free **out-of-fold (OOF)**
-  accuracy over the whole train set; the Kaggle public LB (~10% of test) is used for
-  format sanity only, never for tuning.
+```text
+convnext_small: acc=0.7785
+convnext_base: acc=0.7961
+ensemble_equal: acc=0.7924
+```
 
-## Deliverables
+## Inference
 
-- **Trained weights (Google Drive):** _<link TBD — uploaded after the final ≥96% run>_
-- **Kaggle leaderboard screenshot:** _<image TBD — added after submission>_
-- **Report (PDF):** _<added with the final submission>_
+Generate a full Kaggle CSV for all 1,036 test images:
+
+```bash
+python src/predict.py \
+  --ckpt-dir checkpoints_local \
+  --backbones convnext_base \
+  --out submission/submission.csv
+```
+
+The inference script validates row count, ID order, column names, and label range
+before writing the CSV.
+
+## Data Notes
+
+The verified dataset contains 1,079 train images across 100 classes, with class
+counts ranging from 4 to 41 images. The test directory contains 1,036 images.
+
+The folder name is the label: `Data/train/7/...` maps to label `7`. The code uses
+an explicit `int(folder_name)` mapping and asserts labels are exactly `0..99`.
